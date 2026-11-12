@@ -82,6 +82,7 @@ vi.mock("react-native-gesture-handler", () => ({
 	},
 }));
 vi.mock("react-native-reanimated", () => ({
+	useFrameCallback: () => null,
 	default: {
 		View: ({ children, ...props }: { children: ReactNode }) => {
 			input.animatedProps = props;
@@ -113,7 +114,7 @@ vi.mock("react-native-reanimated", () => ({
 			},
 		});
 	},
-	runOnJS: (callback: unknown) => callback,
+	runOnJS: (callback: (...args: unknown[]) => void) => callback,
 }));
 vi.mock("../../ui/theme/useMobileTheme", () => ({
 	useMobileColors: () => ({ card: "#fff" }),
@@ -175,7 +176,7 @@ describe("note row input ownership", () => {
 		expect(input.onArchive).not.toHaveBeenCalled();
 	});
 
-	it("cancels the reveal spring before committing a full-swipe action", () => {
+	it("does not reset the swipeable before committing a full-swipe action", () => {
 		renderRow(false, "organize");
 		setSwipeWidth();
 		input.swipeableMethods.reset.mockImplementation(() =>
@@ -184,8 +185,8 @@ describe("note row input ownership", () => {
 		input.onOrganize.mockImplementation(() => input.events.push("organize"));
 		finishSwipe();
 
-		expect(input.events).toEqual(["reset", "organize"]);
-		expect(input.swipeableMethods.reset).toHaveBeenCalledTimes(1);
+		expect(input.events).toEqual(["organize"]);
+		expect(input.swipeableMethods.reset).not.toHaveBeenCalled();
 	});
 
 	it("keeps a partial swipe revealed without resetting the swipeable", () => {

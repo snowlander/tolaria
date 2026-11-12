@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useMemo, useRef } from "react";
+import { Fragment, type ReactNode, useCallback, useMemo, useRef } from "react";
 import { type StyleProp, Vibration, View, type ViewStyle } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Swipeable, {
@@ -9,12 +9,14 @@ import Animated, {
 	FadeOutUp,
 	LinearTransition,
 	runOnJS,
+	type SharedValue,
 	SlideInLeft,
 	SlideOutLeft,
 	useReducedMotion,
 	useSharedValue,
 } from "react-native-reanimated";
 import { useMobileAnalytics } from "../../analytics/useMobileAnalytics";
+import { useMobileMotionFrameProbe } from "../../qa/mobileMotionFrameProbe";
 import { useMobileColors } from "../../ui/theme/useMobileTheme";
 import type { MobileNote } from "../../workspace/mobileWorkspaceModel";
 import { MobileNoteSwipeActions } from "./MobileNoteSwipeActions";
@@ -91,11 +93,10 @@ function useSwipeableNoteActions(
 	const analytics = useMobileAnalytics();
 	const swipeable = useRef<SwipeableMethods>(null);
 	const perform = useCallback(
-		(action: MobileNoteSwipeAction | "delete", committedFullSwipe = false) => {
+		(action: MobileNoteSwipeAction | "delete") => {
 			performSwipeAction({
 				action,
 				actions,
-				committedFullSwipe,
 				noteId: note.id,
 				archived: note.archived ?? false,
 				swipeable: swipeable.current,
@@ -111,18 +112,15 @@ function performSwipeAction({
 	action,
 	archived,
 	actions,
-	committedFullSwipe,
 	noteId,
 	swipeable,
 }: {
 	action: MobileNoteSwipeAction | "delete";
 	archived: boolean;
 	actions: MobileNoteRowActions;
-	committedFullSwipe: boolean;
 	noteId: string;
 	swipeable: SwipeableMethods | null;
 }) {
-	if (committedFullSwipe) swipeable?.reset();
 	switch (action) {
 		case "favorite":
 			swipeable?.close();
@@ -180,7 +178,7 @@ function SwipeableNoteRow({
 					);
 					if (action && !committed.get()) {
 						committed.set(true);
-						runOnJS(perform)(action, true);
+						runOnJS(perform)(action);
 					}
 				}),
 		[actions.primarySwipeAction, committed, hapticPlayed, perform, width],
@@ -209,10 +207,16 @@ function SwipeableNoteRow({
 					overshootLeft={false}
 					simultaneousWithExternalGesture={fullSwipe}
 					renderRightActions={(_, translation) => (
-						<MobileNoteSwipeActions
-							{...actionProps}
-							translation={translation}
-						/>
+						<Fragment>
+							<MobileNoteSwipeActions
+								{...actionProps}
+								translation={translation}
+							/>
+							<SwipeTranslationMotionProbe
+								noteId={note.id}
+								translation={translation}
+							/>
+						</Fragment>
 					)}
 				>
 					{children}
@@ -220,6 +224,17 @@ function SwipeableNoteRow({
 			</View>
 		</GestureDetector>
 	);
+}
+
+function SwipeTranslationMotionProbe({
+	noteId,
+	translation,
+}: {
+	noteId: string;
+	translation: SharedValue<number>;
+}) {
+	useMobileMotionFrameProbe(`organize-swipe.${noteId}`, translation);
+	return null;
 }
 
 function emitSwipeHaptic() {
